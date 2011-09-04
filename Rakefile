@@ -1,0 +1,354 @@
+require 'time'
+
+def manifest() @manifest ||= REXML::Document.new(File.read(MANIFEST_FILE)) end
+def package() manifest.root.attribute('package') end
+def build_project_name() @build_project_name ||= REXML::Document.new(File.read('build.xml')).elements['project'].attribute(:name).value end
+def sdcard_path() @sdcard_path ||= "/mnt/sdcard/Android/data/#{package}/files" end
+def app_files_path() @app_files_path ||= "/data/data/#{package}/files" end
+
+require 'rake/clean'
+require 'rexml/document'
+
+UPDATE_MARKER_FILE = File.expand_path(File.join('tmp', 'LAST_UPDATE'), File.dirname(__FILE__))
+BUNDLE_JAR         = File.expand_path 'libs/bundle.jar'
+BUNDLE_PATH        = File.expand_path 'tmp/bundle'
+MANIFEST_FILE      = File.expand_path 'AndroidManifest.xml'
+RUBOTO_CONFIG_FILE = File.expand_path 'ruboto.yml'
+GEM_FILE           = File.expand_path('Gemfile.apk')
+APK_FILE           = File.expand_path "bin/#{build_project_name}-debug.apk"
+TEST_APK_FILE      = File.expand_path "test/bin/#{build_project_name}Test-debug.apk"
+JRUBY_JARS         = Dir[File.expand_path 'libs/jruby-*.jar']
+RESOURCE_FILES     = Dir[File.expand_path 'res/**/*']
+JAVA_SOURCE_FILES  = Dir[File.expand_path 'src/**/*.java']
+
+CLEAN.include('tmp', 'bin')
+
+task :default => :debug
+
+file JRUBY_JARS => RUBOTO_CONFIG_FILE do
+  next unless File.exists? RUBOTO_CONFIG_FILE
+  jruby_jars_mtime = JRUBY_JARS.map{|f| File.mtime(f)}.min
+  ruboto_yml_mtime = File.mtime(RUBOTO_CONFIG_FILE)
+  next if jruby_jars_mtime > ruboto_yml_mtime
+  puts '*' * 80
+  if JRUBY_JARS.empty?
+    puts '  The JRuby jars are missing.'
+  else
+    puts "  The JRuby jars need reconfiguring after changes to #{RUBOTO_CONFIG_FILE}"
+    puts "  #{RUBOTO_CONFIG_FILE}: #{ruboto_yml_mtime}"
+    puts "  #{JRUBY_JARS.join(', ')}: #{jruby_jars_mtime}"
+  end
+  puts '  Run "ruboto update jruby" to regenerate the JRuby jars'
+  puts '*' * 80
+end
+
+desc 'build debug package'
+task :debug => APK_FILE
+
+desc "build package and install it on the emulator or device"
+task :install => APK_FILE do
+  install_apk
+end
+
+task :release do
+  sh 'ant release'
+end
+
+task :tag => :release do
+  unless `git branch` =~ /^\* master$/
+    puts "You must be on the master branch to release!"
+    exit!
+  end
+  sh "git commit --allow-empty -a -m 'Release #{version}'"
+  sh "git tag #{version}"
+  sh "git push origin master --tags"
+  #sh "gem push pkg/#{name}-#{version}.gem"
+end
+
+task :sign => :release do
+  sh "jarsigner -keystore #{ENV['RUBOTO_KEYSTORE']} -signedjar bin/#{build_project_name}.apk bin/#{build_project_name}-unsigned.apk #{ENV['RUBOTO_KEY_ALIAS']}"
+end
+
+task :align => :sign do
+  sh "zipalign 4 bin/#{build_project_name}.apk #{build_project_name}.apk"
+end
+
+task :publish => :align do
+  puts "#{build_project_name}.apk is ready for the market!"
+end
+
+desc 'Start the emulator with larger disk'
+task :emulator do
+  system 'emulator -partition-size 1024 -avd Android_3.0'
+end
+
+task :start do
+  `adb shell am start -a android.intent.action.MAIN -n #{package}/.#{main_activity}`
+end
+
+task :stop do
+  `adb shell ps | grep #{package} | awk '{print $2}' | xargs adb shell kill`
+end
+
+desc 'Restart the application'
+task :restart => [:stop, :start]
+
+task :uninstall do
+  uninstall_apk
+end
+
+namespace :install do
+  desc 'Uninstall, build, and install the application'
+  task :clean => [:uninstall, APK_FILE, :install]
+end
+
+file MANIFEST_FILE
+file RUBOTO_CONFIG_FILE
+
+file APK_FILE => [MANIFEST_FILE, RUBOTO_CONFIG_FILE, BUNDLE_JAR] + JRUBY_JARS + JAVA_SOURCE_FILES + RESOURCE_FILES do |t|
+  if File.exist?(APK_FILE)
+    changed_prereqs = t.prerequisites.select do |p|
+      File.exist?(p) && !Dir[p].empty? && Dir[p].map{|f| File.mtime(f)}.max > File.mtime(APK_FILE)
+    end
+    next if changed_prereqs.empty?
+    changed_prereqs.each{|f| puts "#{f} changed."}
+    puts "Forcing rebuild of #{APK_FILE}."
+  end
+  sh 'ant debug'
+end
+
+desc 'Copy scripts to emulator or device'
+task :update_scripts do
+  if device_path_exists?(sdcard_path)
+    data_dir_name = 'public'
+    data_dir = sdcard_path
+  elsif device_path_exists?(app_files_path)
+    data_dir_name = 'private'
+    data_dir = app_files_path
+  else
+    puts 'Cannot find the scripts directory on the device.'
+    unless manifest.root.elements["uses-permission[@android:name='android.permission.WRITE_EXTERNAL_STORAGE']"]
+      puts 'If you have a non-rooted device, you need to add'
+      puts %q{    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />}
+      puts 'to the AndroidManifest.xml file to enable the update_scripts rake task.'
+    end
+    puts "Reverting to uninstalling and re-installing the apk."
+    Rake::Task[:uninstall].reenable
+    Rake::Task[:uninstall].invoke
+    FileUtils.rm_f APK_FILE
+    Rake::Task[APK_FILE].reenable
+    Rake::Task[APK_FILE].invoke
+    Rake::Task[:install].reenable
+    Rake::Task[:install].invoke
+    next
+  end
+  Rake::Task['install'].invoke
+  puts "Pushing files to apk #{data_dir_name} file area."
+  last_update = File.exists?(UPDATE_MARKER_FILE) ? Time.parse(File.read(UPDATE_MARKER_FILE)) : Time.parse('1970-01-01T00:00:00')
+  Dir.chdir('assets') do
+    Dir["scripts/**/*"].each do |asset_file|
+      next if File.directory? asset_file
+      next if File.mtime(asset_file) < last_update
+      next if asset_file =~ /~$/
+      print "#{asset_file}: "; $stdout.flush
+      `adb push #{asset_file} #{data_dir}/#{asset_file}`
+    end
+  end
+  mark_update
+end
+
+namespace :update_scripts do
+  desc 'Copy scripts to emulator and restart the app'
+  task :restart => [:stop, :update_scripts, :start]
+end
+
+task :update_test_scripts do
+  test_scripts_path = "/data/data/#{package}.tests/files/scripts"
+  # TODO(uwe): Investigate if we can just push the scripts instead of building and installing the instrumentation APK
+  if package_installed?(true) && device_path_exists?(test_scripts_path)
+    Dir['test/assets/scripts/*.rb'].each do |script|
+      print "#{script}: " ; $stdout.flush
+      `adb push #{script} #{test_scripts_path}`
+    end
+    `adb shell ps | grep #{package}.tests | awk '{print $2}' | xargs adb shell kill`
+  else
+    Dir.chdir 'test' do
+      sh 'ant install'
+    end
+  end
+end
+
+task :test => :uninstall do
+  Dir.chdir('test') do
+    puts 'Running tests'
+    system "adb uninstall #{package}.tests"
+    system "ant run-tests"
+  end
+end
+
+namespace :test do
+  task :quick => [:update_scripts, :update_test_scripts] do
+    Dir.chdir('test') do
+      puts 'Running quick tests'
+      sh "ant run-tests-quick"
+    end
+  end
+end
+
+file GEM_FILE
+
+desc 'Generate bundle jar from Gemfile'
+file BUNDLE_JAR => GEM_FILE do
+  next unless File.exists? GEM_FILE
+  puts "Generating #{BUNDLE_JAR}"
+
+  FileUtils.mkdir_p BUNDLE_PATH
+  sh "bundle install --gemfile #{GEM_FILE} --path=#{BUNDLE_PATH}"
+
+  # FIXME(uwe):  Should not be necessary.  ARJDBC should not offer the same files as AR.
+
+  Dir.chdir "#{BUNDLE_PATH}/ruby/1.8/gems" do
+    scanned_files = []
+    Dir["*/lib/**/*"].each do |f|
+      raise "Malformed file name" unless f =~ %r{^(.*?)/lib/(.*)$}
+      gem_name, lib_file = $1, $2
+      if existing_file = scanned_files.find{|sf| sf =~ %r{(.*?)/lib/#{lib_file}}}
+        puts "Removing duplicate of file #{lib_file} in gem #{gem_name}"
+        puts "Already present in gem #{$1}"
+      end
+    end
+  end
+
+  # FIXME(uwe):  Remove when directory listing in apk subdirectories work.
+  # FIXME(uwe):  http://jira.codehaus.org/browse/JRUBY-5775
+  Dir["#{BUNDLE_PATH}/ruby/1.8/gems/activesupport-*/lib/active_support/core_ext.rb"].each do |faulty_file|
+    faulty_code = <<-'EOF'
+Dir["#{File.dirname(__FILE__)}/core_ext/*.rb"].sort.each do |path|
+  require "active_support/core_ext/#{File.basename(path, '.rb')}"
+end
+    EOF
+    replace_faulty_code(faulty_file, faulty_code)
+  end
+
+  Dir["#{BUNDLE_PATH}/ruby/1.8/gems/activemodel-*/lib/active_model/validations.rb"].each do |faulty_file|
+    faulty_code = <<-EOF
+Dir[File.dirname(__FILE__) + "/validations/*.rb"].sort.each do |path|
+  filename = File.basename(path)
+  require "active_model/validations/\#{filename}"
+end
+    EOF
+    replace_faulty_code(faulty_file, faulty_code)
+  end
+  # FIXME end
+
+  # Expand JARs
+  Dir.chdir "#{BUNDLE_PATH}/ruby/1.8/gems" do
+    Dir['*'].each do |gem_lib|
+      next if gem_lib =~ /jdbc-sqlite/
+      Dir.chdir "#{gem_lib}/lib" do
+        Dir['**/*.jar'].each do |jar|
+          puts "Expanding #{gem_lib} #{jar} into #{BUNDLE_JAR}"
+
+          `jar xf #{jar}`
+          FileUtils.rm_f(jar)
+          # FileUtils.touch(jar + '.rb')
+          # FileUtils.touch(jar.chomp('jar') + 'rb')
+        end
+      end
+    end
+  end
+
+
+  FileUtils.rm_f BUNDLE_JAR
+  Dir["#{BUNDLE_PATH}/ruby/1.8/gems/*"].each_with_index do |gem_dir, i|
+    `jar #{i == 0 ? 'c' : 'u'}f #{BUNDLE_JAR} -C #{gem_dir}/lib .`
+  end
+  FileUtils.rm_rf BUNDLE_PATH
+
+  Rake::Task['install'].invoke
+end
+
+# Methods
+
+def mark_update(time = Time.now)
+  FileUtils.mkdir_p File.dirname(UPDATE_MARKER_FILE)
+  File.open(UPDATE_MARKER_FILE, 'w'){|f| f << time.iso8601}
+end
+
+def clear_update
+  FileUtils.rm_f UPDATE_MARKER_FILE
+end
+
+def strings(name)
+  @strings ||= REXML::Document.new(File.read('res/values/strings.xml'))
+  value = @strings.elements["//string[@name='#{name.to_s}']"] or raise "string '#{name}' not found in strings.xml"
+  value.text
+end
+
+def version() strings :version_name end
+
+def app_name() strings :app_name end
+
+def main_activity() manifest.root.elements['application'].elements["activity[@android:label='@string/app_name']"].attribute('android:name') end
+
+def device_path_exists?(path)
+  path_output =`adb shell ls #{path}`
+  result = path_output.chomp !~ /No such file or directory|opendir failed, Permission denied/
+  result
+end
+
+def package_installed? test = false
+  package_name = "#{package}#{'.tests' if test}"
+  ['', '-0', '-1', '-2'].each do |i|
+    p = "/data/app/#{package_name}#{i}.apk"
+    o = `adb shell ls -l #{p}`.chomp
+    if o =~ /^-rw-r--r-- system\s+system\s+(\d+) \d{4}-\d{2}-\d{2} \d{2}:\d{2} #{File.basename(p)}$/
+      apk_file = test ? TEST_APK_FILE : APK_FILE
+      if !File.exists?(apk_file) || $1.to_i == File.size(apk_file)
+        return true
+      else
+        return false
+      end
+    end
+  end
+  return nil
+end
+
+private
+
+def replace_faulty_code(faulty_file, faulty_code)
+  explicit_requires = Dir["#{faulty_file.chomp('.rb')}/*.rb"].sort.map{|f| File.basename(f)}.map do |filename|
+    "require 'active_model/validations/#{filename}'"
+  end.join("\n")
+
+  old_code = File.read(faulty_file)
+  new_code = old_code.gsub faulty_code, explicit_requires
+  if new_code != old_code
+    puts "Replaced directory listing code in file #{faulty_file} with explicit requires."
+    File.open(faulty_file, 'w'){|f| f << new_code}
+  else
+    puts "Could not find expected faulty code\n\n#{faulty_code}\n\nin file #{faulty_file}\n\n#{old_code}\n\n"
+  end
+end
+
+def install_apk
+  case package_installed?
+  when true
+    puts "Package already installed."
+    return
+  when false
+    puts "Package installed, but of wrong size."
+  end
+  sh 'ant ruboto-install-debug'
+  clear_update
+end
+
+def uninstall_apk
+  return if package_installed?.nil?
+  puts "Uninstalling package #{package}"
+  system "adb uninstall #{package}"
+  if $? != 0 && package_installed?
+    puts "Uninstall failed exit code #{$?}"
+    exit $?
+  end
+end

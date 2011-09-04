@@ -38,7 +38,7 @@ class Report
             BasicNameValuePair.new('startup[model]', android.os.Build::MODEL),
             BasicNameValuePair.new('startup[android_version]', android.os.Build::VERSION::RELEASE),
             BasicNameValuePair.new('startup[ruboto_platform_version]', activity.package_manager.getPackageInfo('org.ruboto.core', 0).versionName),
-            BasicNameValuePair.new('startup[ruboto_app_version]', RUBOTO::VERSION),
+            BasicNameValuePair.new('startup[ruboto_app_version]', Ruboto::VERSION),
         ]
         entity = UrlEncodedFormEntity.new(list)
         create_method.setEntity(entity)

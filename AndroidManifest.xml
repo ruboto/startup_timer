@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?> 
-<manifest xmlns:android='http://schemas.android.com/apk/res/android' android:versionName='0.9.1' package='org.ruboto.startup_timer' android:versionCode='10'>
+<manifest xmlns:android='http://schemas.android.com/apk/res/android' android:versionName='0.9.2' package='org.ruboto.startup_timer' android:versionCode='11'>
     <application android:label='@string/app_name' android:icon='@drawable/icon'>
         <activity android:name='StartupTimerActivity' android:label='@string/app_name'>
             <intent-filter>

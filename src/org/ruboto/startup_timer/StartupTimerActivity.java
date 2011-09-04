@@ -7,6 +7,8 @@ import org.ruboto.Script;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
@@ -22,6 +24,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
     public static Long stop;
     private int splash = 0;
     private ProgressDialog loadingDialog;
+    private boolean dialogCancelled = false;
     private BroadcastReceiver receiver;
     private boolean appStarted = false;
 
@@ -59,7 +62,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         Log.d("RUBOTO", "onResume: Checking JRuby");
         if (Script.isInitialized()) {
             Log.d("RUBOTO", "Already initialized");
-    	    startRubotoActivity();
+    	    fireRubotoActivity();
         } else {
             Log.d("RUBOTO", "Not initialized");
             showProgress();
@@ -94,6 +97,14 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         super.onPause();
     }
 
+    public void onDestroy() {
+        super.onDestroy();
+        if (dialogCancelled) {
+            System.runFinalizersOnExit(true);
+            System.exit(0);
+        }
+    }
+
     private void initJRuby(final boolean firstTime) {
         new Thread(new Runnable() {
             public void run() {
@@ -103,7 +114,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
                     prepareJRuby();
                     runOnUiThread(new Runnable() {
                         public void run() {
-                            startRubotoActivity();
+                            fireRubotoActivity();
                         }
                     });
                 } else {
@@ -143,7 +154,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         }
     }
 
-    private void startRubotoActivity() {
+    private void fireRubotoActivity() {
         if(appStarted) return;
         appStarted = true;
         Log.i("RUBOTO", "Starting activity");
@@ -160,7 +171,14 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
                 requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
                 setContentView(splash);
             } else {
-                loadingDialog = ProgressDialog.show(this, null, "Starting...", true, false);
+                loadingDialog = ProgressDialog.show(this, null, "Starting...", true, true);
+                loadingDialog.setCanceledOnTouchOutside(false);
+                loadingDialog.setOnCancelListener(new OnCancelListener() {
+                    public void onCancel(DialogInterface dialog) {
+                        dialogCancelled = true;
+                        finish();
+                    }
+                });
             }
         }
     }

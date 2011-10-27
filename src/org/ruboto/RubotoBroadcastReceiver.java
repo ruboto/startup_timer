@@ -25,11 +25,17 @@ public abstract class RubotoBroadcastReceiver extends android.content.BroadcastR
 
     public RubotoBroadcastReceiver(String scriptName) {
         setScriptName(scriptName);
-        Script.defineGlobalVariable("$broadcast_receiver", this);
+        if (Script.isInitialized()) {
+            loadScript();
+        }
+    }
+
+    protected void loadScript() {
+        Script.put("$broadcast_receiver", this);
         try {
             new Script(scriptName).execute();
         } catch(IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException("IOException loading broadcast receiver script", e);
         }
     }
 

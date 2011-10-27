@@ -1,5 +1,6 @@
 package org.ruboto.startup_timer;
 
+import java.io.File;
 import java.io.IOException;
 
 import org.ruboto.Script;
@@ -37,6 +38,8 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
     }
 
 	public void onCreate(Bundle bundle) {
+        Log.d("RUBOTO", "onCreate: ");
+
 	    try {
     		splash = Class.forName(getPackageName() + ".R$layout").getField("splash").getInt(null);
 		} catch (Exception e) {
@@ -90,6 +93,8 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
     }
 
     public void onPause() {
+        Log.d("RUBOTO", "onPause: ");
+
         if (receiver != null) {
     	    unregisterReceiver(receiver);
     	    receiver = null;
@@ -98,6 +103,8 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
     }
 
     public void onDestroy() {
+        Log.d("RUBOTO", "onDestroy: ");
+
         super.onDestroy();
         if (dialogCancelled) {
             System.runFinalizersOnExit(true);
@@ -142,6 +149,9 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         }).start();
     }
 
+	private static final String RUBOTO_APK = "RubotoCore-release.apk";
+	private static final String RUBOTO_URL = "https://github.com/downloads/ruboto/ruboto-core/" + RUBOTO_APK;
+
     // Called when buton is pressed.
     public void getRubotoCore(View view) {
         try {
@@ -149,7 +159,8 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         } catch (android.content.ActivityNotFoundException anfe) {
             try {
                 TextView textView = (TextView) findViewById(Class.forName(getPackageName() + ".R$id").getField("text").getInt(null));
-                textView.setText("Could not find the Android Market App.  You will have to install Ruboto Core manually.  Bummer!");
+                Intent intent = new Intent(android.content.Intent.ACTION_VIEW, Uri.parse(RUBOTO_URL));
+                startActivity(intent);
             } catch (Exception e) {}
         }
     }
@@ -160,7 +171,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
         Log.i("RUBOTO", "Starting activity");
         loadScript();
         onStart();
-        onResume();
+        super.onResume();
         hideProgress();
     }
 

@@ -15,7 +15,7 @@ import android.widget.TextView;
 
 public class RubotoActivity extends android.app.Activity {
     private String scriptName;
-    private String remoteVariable = "";
+    private String remoteVariable = null;
     private Object[] args;
     private Bundle configBundle;
 
@@ -77,8 +77,12 @@ public class RubotoActivity extends android.app.Activity {
     }
 	
     public RubotoActivity setRemoteVariable(String var) {
-        remoteVariable = ((var == null) ? "" : (var + "."));
+        remoteVariable = var;
         return this;
+    }
+
+    public String getRemoteVariableCall(String call) {
+        return (remoteVariable == null ? "" : (remoteVariable + ".")) + call;
     }
 
     public void setScriptName(String name) {
@@ -136,7 +140,7 @@ public class RubotoActivity extends android.app.Activity {
                 if (configBundle.getString("Initialize Script") != null) {
                     Script.execute(configBundle.getString("Initialize Script"));
                 }
-                Script.execute(remoteVariable + "on_create($bundle)");
+                Script.execute(getRemoteVariableCall("on_create($bundle)"));
             } else {
                 throw new RuntimeException("Neither script name nor remote variable was set.");
             }

@@ -152,7 +152,7 @@ public class StartupTimerActivity extends org.ruboto.RubotoActivity {
 	private static final String RUBOTO_APK = "RubotoCore-release.apk";
 	private static final String RUBOTO_URL = "https://github.com/downloads/ruboto/ruboto-core/" + RUBOTO_APK;
 
-    // Called when buton is pressed.
+    // Called when the button is pressed.
     public void getRubotoCore(View view) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW).setData(Uri.parse("market://details?id=org.ruboto.core")));

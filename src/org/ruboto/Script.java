@@ -79,26 +79,49 @@ public class Script {
             System.setProperty("jruby.bytecode.version", "1.5");
             System.setProperty("jruby.interfaces.useProxy", "true");
             System.setProperty("jruby.management.enabled", "false");
+            System.setProperty("jruby.objectspace.enabled", "false");
+            System.setProperty("jruby.thread.pooling", "true");
+            System.setProperty("jruby.native.enabled", "false");
+
+            // Uncomment these to debug Ruby source loading
+            // System.setProperty("jruby.debug.loadService", "true");
+            // System.setProperty("jruby.debug.loadService.timing", "true");
+
 
             ClassLoader classLoader;
             Class<?> scriptingContainerClass;
+            String apkName = null;
 
             try {
                 scriptingContainerClass = Class.forName("org.jruby.embed.ScriptingContainer");
                 System.out.println("Found JRuby in this APK");
                 classLoader = Script.class.getClassLoader();
-            } catch (ClassNotFoundException e1) {
-                String packagePath = "org.ruboto.core";
-                String apkName = null;
                 try {
-                    apkName = appContext.getPackageManager().getApplicationInfo(packagePath, 0).sourceDir;
+                    apkName = appContext.getPackageManager().getApplicationInfo(appContext.getPackageName(), 0).sourceDir;
+                } catch (NameNotFoundException e) {}
+            } catch (ClassNotFoundException e1) {
+                String packageName = "org.ruboto.core";
+                try {
+                    apkName = appContext.getPackageManager().getApplicationInfo(packageName, 0).sourceDir;
                 } catch (PackageManager.NameNotFoundException e) {
                     System.out.println("JRuby not found");
                     return false;
                 }
 
                 System.out.println("Found JRuby in platform APK");
-                classLoader = new PathClassLoader(apkName, Script.class.getClassLoader());
+                if (true) {
+                    classLoader = new PathClassLoader(apkName, Script.class.getClassLoader());
+                } else {
+                    // Alternative way to get the class loader.  The other way is rumoured to have memory leaks.
+                try {
+                        Context platformAppContext = appContext.createPackageContext(packageName, Context.CONTEXT_INCLUDE_CODE + Context.CONTEXT_IGNORE_SECURITY);
+                        classLoader = platformAppContext.getClassLoader();
+                    } catch (PackageManager.NameNotFoundException e) {
+                        System.out.println("Could not create package context even if application info could be found.  Should never happen.");
+                        return false;
+                    }
+                }
+
                 try {
                     scriptingContainerClass = Class.forName("org.jruby.embed.ScriptingContainer", true, classLoader);
                 } catch (ClassNotFoundException e) {
@@ -127,16 +150,24 @@ public class Script {
                 Class compileModeClass = Class.forName("org.jruby.RubyInstanceConfig$CompileMode", true, classLoader);
                 callScriptingContainerMethod(Void.class, "setCompileMode", Enum.valueOf(compileModeClass, "OFF"));
 
+                // Class traceTypeClass = Class.forName("org.jruby.runtime.backtrace.TraceType", true, classLoader);
+        	    // Method traceTypeForMethod = traceTypeClass.getMethod("traceTypeFor", String.class);
+        	    // Object traceTypeRaw = traceTypeForMethod.invoke(null, "raw");
+                // callScriptingContainerMethod(Void.class, "setTraceType", traceTypeRaw);
+
+                // FIXME(uwe): Write tutorial on profiling.
+                // container.getProvider().getRubyInstanceConfig().setProfilingMode(mode);
+
                 // callScriptingContainerMethod(Void.class, "setClassLoader", classLoader);
         	    Method setClassLoaderMethod = ruby.getClass().getMethod("setClassLoader", ClassLoader.class);
         	    setClassLoaderMethod.invoke(ruby, classLoader);
 
                 Thread.currentThread().setContextClassLoader(classLoader);
 
-                if (scriptsDir != null) {
-                    Log.d(TAG, "Setting JRuby current directory to " + scriptsDir);
-                    callScriptingContainerMethod(Void.class, "setCurrentDirectory", scriptsDir);
-                }
+                String defaultCurrentDir = appContext.getFilesDir().getPath();
+                Log.d(TAG, "Setting JRuby current directory to " + defaultCurrentDir);
+                callScriptingContainerMethod(Void.class, "setCurrentDirectory", defaultCurrentDir);
+
                 if (out != null) {
                     // callScriptingContainerMethod(Void.class, "setOutput", out);
         	        Method setOutputMethod = ruby.getClass().getMethod("setOutput", PrintStream.class);
@@ -146,6 +177,11 @@ public class Script {
         	        Method setErrorMethod = ruby.getClass().getMethod("setError", PrintStream.class);
         	        setErrorMethod.invoke(ruby, out);
                 }
+
+                String jrubyHome = "file:" + apkName + "!";
+                Log.i(TAG, "Setting JRUBY_HOME: " + jrubyHome);
+                System.setProperty("jruby.home", jrubyHome);
+
                 String extraScriptsDir = scriptsDirName(appContext);
                 Log.i(TAG, "Checking scripts in " + extraScriptsDir);
                 if (configDir(extraScriptsDir)) {
@@ -272,29 +308,29 @@ public class Script {
     	return scriptsDirFile;
     }
 
-    public static Boolean configDir(String scriptsDir) {
-        setDir(scriptsDir);
-        Method getLoadPathsMethod;
-        List<String> loadPath = callScriptingContainerMethod(List.class, "getLoadPaths");
-        
-        if (!loadPath.contains(scriptsDir)) {
-            Log.i(TAG, "Adding scripts dir to load path: " + scriptsDir);
-            loadPath.add(0, scriptsDir);
-            // callScriptingContainerMethod(Void.class, "setLoadPaths", loadPath);
-            try {
-                Method setLoadPathsMethod = ruby.getClass().getMethod("setLoadPaths", List.class);
-                setLoadPathsMethod.invoke(ruby, loadPath);
-            } catch (NoSuchMethodException nsme) {
-                throw new RuntimeException(nsme);
-            } catch (IllegalAccessException iae) {
-                throw new RuntimeException(iae);
-            } catch (java.lang.reflect.InvocationTargetException ite) {
-                throw new RuntimeException(ite);
-            }
+    private static void setLoadPath(List<String> loadPath) {
+        // callScriptingContainerMethod(Void.class, "setLoadPaths", loadPath);
+        try {
+            Method setLoadPathsMethod = ruby.getClass().getMethod("setLoadPaths", List.class);
+            setLoadPathsMethod.invoke(ruby, loadPath);
+        } catch (NoSuchMethodException nsme) {
+            throw new RuntimeException(nsme);
+        } catch (IllegalAccessException iae) {
+            throw new RuntimeException(iae);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            throw new RuntimeException(ite);
         }
+    }
 
-        if (scriptsDirFile.exists()) {
+    private static List<String> getLoadPath() {
+        return callScriptingContainerMethod(List.class, "getLoadPaths");
+    }
+
+    public static Boolean configDir(String scriptsDir) {
+        if (new File(scriptsDir).exists()) {
             Log.i(TAG, "Found extra scripts dir: " + scriptsDir);
+            setDir(scriptsDir);
+            exec("$:.unshift '" + scriptsDir + "' ; $:.uniq! ; p $:");
             return true;
         } else {
             Log.i(TAG, "Extra scripts dir not present: " + scriptsDir);

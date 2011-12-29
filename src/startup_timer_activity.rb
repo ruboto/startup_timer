@@ -35,6 +35,8 @@ $activity.handle_create do |bundle|
       Report.send_report(self, WITH_IMAGE, @startup_time)
     when @exit_button
       finish
+      java.lang.System.runFinalizersOnExit(true)
+      java.lang.System.exit(0)
     end
   end
 
@@ -42,11 +44,6 @@ $activity.handle_create do |bundle|
     $package.StartupTimerActivity.stop ||= java.lang.System.currentTimeMillis
     @startup_time ||= $package.StartupTimerActivity.stop - $package.StartupTimerActivity::START
     @text_view.text = "Startup took #{@startup_time} ms"
-  end
-
-  handle_destroy do
-    java.lang.System.runFinalizersOnExit(true)
-    java.lang.System.exit(0)
   end
 
 end

@@ -1,3 +1,8 @@
+if `ant -version` !~ /version (\d+)\.(\d+)\.(\d+)/ || $1.to_i < 1 || ($1.to_i == 1 && $2.to_i < 8)
+  puts "ANT version 1.8.0 or later required.  Version found: #{$1}.#{$2}.#{$3}"
+  exit 1
+end
+
 require 'time'
 
 def manifest() @manifest ||= REXML::Document.new(File.read(MANIFEST_FILE)) end
@@ -10,9 +15,9 @@ require 'rake/clean'
 require 'rexml/document'
 
 PROJECT_DIR        = Dir.getwd
-UPDATE_MARKER_FILE = File.expand_path(File.join('tmp', 'LAST_UPDATE'), File.dirname(__FILE__))
+UPDATE_MARKER_FILE = File.expand_path(File.join('bin', 'LAST_UPDATE'), File.dirname(__FILE__))
 BUNDLE_JAR         = File.expand_path 'libs/bundle.jar'
-BUNDLE_PATH        = File.expand_path 'tmp/bundle'
+BUNDLE_PATH        = File.expand_path 'bin/bundle'
 MANIFEST_FILE      = File.expand_path 'AndroidManifest.xml'
 RUBOTO_CONFIG_FILE = File.expand_path 'ruboto.yml'
 GEM_FILE           = File.expand_path('Gemfile.apk')
@@ -25,8 +30,10 @@ RESOURCE_FILES     = Dir[File.expand_path 'res/**/*']
 JAVA_SOURCE_FILES  = Dir[File.expand_path 'src/**/*.java']
 RUBY_SOURCE_FILES  = Dir[File.expand_path 'src/**/*.rb']
 APK_DEPENDENCIES   = [MANIFEST_FILE, RUBOTO_CONFIG_FILE, BUNDLE_JAR] + JRUBY_JARS + JAVA_SOURCE_FILES + RESOURCE_FILES + RUBY_SOURCE_FILES
+KEYSTORE_FILE      = (key_store = File.readlines('ant.properties').grep(/^key.store=/).first) ? File.expand_path(key_store.chomp.sub(/^key.store=/, '').sub('${user.home}', '~')) : "#{build_project_name}.keystore"
+KEYSTORE_ALIAS     = (key_alias = File.readlines('ant.properties').grep(/^key.alias=/).first) ? key_alias.chomp.sub(/^key.alias=/, '') : build_project_name
 
-CLEAN.include('tmp', 'bin')
+CLEAN.include('bin')
 
 task :default => :debug
 
@@ -72,21 +79,35 @@ namespace :install do
   end
 end
 
+desc 'Build APK for release'
 task :release => RELEASE_APK_FILE
 
-file RELEASE_APK_FILE => APK_DEPENDENCIES do |t|
+file RELEASE_APK_FILE => [KEYSTORE_FILE] + APK_DEPENDENCIES do |t|
   build_apk(t, true)
 end
 
+desc 'Create a keystore for signing the release APK'
+file KEYSTORE_FILE do
+  unless File.read('ant.properties') =~ /^key.store=/
+    File.open('ant.properties', 'a'){|f| f << "\nkey.store=#{KEYSTORE_FILE.sub('~', '${user.home}')}\n"}
+  end
+  unless File.read('ant.properties') =~ /^key.alias=/
+    File.open('ant.properties', 'a'){|f| f << "\nkey.alias=#{KEYSTORE_ALIAS}\n"}
+  end
+  sh "keytool -genkey -v -keystore #{KEYSTORE_FILE} -alias #{KEYSTORE_ALIAS} -keyalg RSA -keysize 2048 -validity 10000"
+end
+
+desc 'Tag this working copy with the current version'
 task :tag => :release do
   unless `git branch` =~ /^\* master$/
     puts "You must be on the master branch to release!"
     exit!
   end
-  sh "git commit --allow-empty -a -m 'Release #{version}'"
+  # sh "git commit --allow-empty -a -m 'Release #{version}'"
+  output = `git status --porcelain`
+  raise "Workspace not clean!\n#{output}" unless output.empty?
   sh "git tag #{version}"
   sh "git push origin master --tags"
-  #sh "gem push pkg/#{name}-#{version}.gem"
 end
 
 task :sign => :release do
@@ -136,11 +157,10 @@ end
 namespace :update_scripts do
   desc 'Copy scripts to emulator and restart the app'
   task :restart => APK_DEPENDENCIES do |t|
-    if stop_app
-      update_scripts
-    else
-      build_apk(t, false)
+    if build_apk(t, false) || !stop_app
       install_apk
+    else
+      update_scripts
     end
     start_app
   end
@@ -326,7 +346,7 @@ def build_apk(t, release)
     changed_prereqs = t.prerequisites.select do |p|
       File.file?(p) && !Dir[p].empty? && Dir[p].map { |f| File.mtime(f) }.max > File.mtime(APK_FILE)
     end
-    return if changed_prereqs.empty?
+    return false if changed_prereqs.empty?
     changed_prereqs.each { |f| puts "#{f} changed." }
     puts "Forcing rebuild of #{apk_file}."
   end
@@ -335,6 +355,7 @@ def build_apk(t, release)
   else
     sh 'ant debug'
   end
+  return true
 end
 
 def install_apk

@@ -124,6 +124,7 @@ public class RubotoActivity extends android.app.Activity {
 
     // This causes JRuby to initialize and takes while
     protected void prepareJRuby() {
+        Script.put("$context", this);
         Script.put("$activity", this);
         Script.put("$bundle", args[0]);
     }
@@ -131,18 +132,15 @@ public class RubotoActivity extends android.app.Activity {
     protected void loadScript() {
         try {
             if (scriptName != null) {
-                new Script(scriptName).execute();
-            } else if (configBundle != null && configBundle.getString("Remote Variable") != null) {
-                setRemoteVariable(configBundle.getString("Remote Variable"));
-                if (configBundle.getBoolean("Define Remote Variable")) {
-                    Script.put(remoteVariable, this);
-                }
-                if (configBundle.getString("Initialize Script") != null) {
-                    Script.execute(configBundle.getString("Initialize Script"));
-                }
-                Script.execute(getRemoteVariableCall("on_create($bundle)"));
+    	        Script.setScriptFilename(getClass().getClassLoader().getResource(scriptName).getPath());
+                Script.execute(new Script(scriptName).getContents());
             } else {
-                throw new RuntimeException("Neither script name nor remote variable was set.");
+                // TODO: Why doesn't this work? 
+                // Script.callMethod(this, "initialize_ruboto");
+                Script.execute("$activity.initialize_ruboto");
+                // TODO: Why doesn't this work?
+                // Script.callMethod(this, "on_create", args[0]);
+                Script.execute("$activity.on_create($bundle)");
             }
         } catch(IOException e){
             e.printStackTrace();

@@ -34,8 +34,11 @@ public class RubotoView extends android.view.View {
   public static final int CB_KEY_PRE_IME = 27;
   public static final int CB_START_TEMPORARY_DETACH = 28;
   public static final int CB_KEY_LONG_PRESS = 29;
+  public static final int CB_CONFIGURATION_CHANGED = 30;
+  public static final int CB_DISPLAY_HINT = 31;
+  public static final int CB_VISIBILITY_CHANGED = 32;
 
-    private Object[] callbackProcs = new Object[30];
+    private Object[] callbackProcs = new Object[33];
 
   public  RubotoView(android.content.Context context) {
     super(context);
@@ -54,7 +57,7 @@ public class RubotoView extends android.view.View {
   }
 	
   public void onAnimationEnd() {
-    if (callbackProcs[CB_ANIMATION_END] != null) {
+    if (callbackProcs != null && callbackProcs[CB_ANIMATION_END] != null) {
       super.onAnimationEnd();
       Script.callMethod(callbackProcs[CB_ANIMATION_END], "call" );
     } else {
@@ -63,7 +66,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onAnimationStart() {
-    if (callbackProcs[CB_ANIMATION_START] != null) {
+    if (callbackProcs != null && callbackProcs[CB_ANIMATION_START] != null) {
       super.onAnimationStart();
       Script.callMethod(callbackProcs[CB_ANIMATION_START], "call" );
     } else {
@@ -72,7 +75,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onAttachedToWindow() {
-    if (callbackProcs[CB_ATTACHED_TO_WINDOW] != null) {
+    if (callbackProcs != null && callbackProcs[CB_ATTACHED_TO_WINDOW] != null) {
       super.onAttachedToWindow();
       Script.callMethod(callbackProcs[CB_ATTACHED_TO_WINDOW], "call" );
     } else {
@@ -81,7 +84,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onCreateContextMenu(android.view.ContextMenu menu) {
-    if (callbackProcs[CB_CREATE_CONTEXT_MENU] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CREATE_CONTEXT_MENU] != null) {
       super.onCreateContextMenu(menu);
       Script.callMethod(callbackProcs[CB_CREATE_CONTEXT_MENU], "call" , menu);
     } else {
@@ -90,7 +93,7 @@ public class RubotoView extends android.view.View {
   }
 
   public int[] onCreateDrawableState(int extraSpace) {
-    if (callbackProcs[CB_CREATE_DRAWABLE_STATE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CREATE_DRAWABLE_STATE] != null) {
       super.onCreateDrawableState(extraSpace);
       return (int[]) Script.callMethod(callbackProcs[CB_CREATE_DRAWABLE_STATE], "call" , extraSpace, int[].class);
     } else {
@@ -99,7 +102,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onDetachedFromWindow() {
-    if (callbackProcs[CB_DETACHED_FROM_WINDOW] != null) {
+    if (callbackProcs != null && callbackProcs[CB_DETACHED_FROM_WINDOW] != null) {
       super.onDetachedFromWindow();
       Script.callMethod(callbackProcs[CB_DETACHED_FROM_WINDOW], "call" );
     } else {
@@ -108,7 +111,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onDraw(android.graphics.Canvas canvas) {
-    if (callbackProcs[CB_DRAW] != null) {
+    if (callbackProcs != null && callbackProcs[CB_DRAW] != null) {
       super.onDraw(canvas);
       Script.callMethod(callbackProcs[CB_DRAW], "call" , canvas);
     } else {
@@ -117,7 +120,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onFinishInflate() {
-    if (callbackProcs[CB_FINISH_INFLATE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_FINISH_INFLATE] != null) {
       super.onFinishInflate();
       Script.callMethod(callbackProcs[CB_FINISH_INFLATE], "call" );
     } else {
@@ -126,7 +129,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onFocusChanged(boolean gainFocus, int direction, android.graphics.Rect previouslyFocusedRect) {
-    if (callbackProcs[CB_FOCUS_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_FOCUS_CHANGED] != null) {
       super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
       Script.callMethod(callbackProcs[CB_FOCUS_CHANGED], "call" , new Object[]{gainFocus, direction, previouslyFocusedRect});
     } else {
@@ -135,7 +138,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_DOWN] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_DOWN] != null) {
       super.onKeyDown(keyCode, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_DOWN], "call" , new Object[]{keyCode, event}, Boolean.class);
     } else {
@@ -144,7 +147,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyMultiple(int keyCode, int repeatCount, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_MULTIPLE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_MULTIPLE] != null) {
       super.onKeyMultiple(keyCode, repeatCount, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_MULTIPLE], "call" , new Object[]{keyCode, repeatCount, event}, Boolean.class);
     } else {
@@ -153,7 +156,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyShortcut(int keyCode, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_SHORTCUT] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_SHORTCUT] != null) {
       super.onKeyShortcut(keyCode, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_SHORTCUT], "call" , new Object[]{keyCode, event}, Boolean.class);
     } else {
@@ -162,7 +165,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyUp(int keyCode, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_UP] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_UP] != null) {
       super.onKeyUp(keyCode, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_UP], "call" , new Object[]{keyCode, event}, Boolean.class);
     } else {
@@ -171,7 +174,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onLayout(boolean changed, int left, int top, int right, int bottom) {
-    if (callbackProcs[CB_LAYOUT] != null) {
+    if (callbackProcs != null && callbackProcs[CB_LAYOUT] != null) {
       super.onLayout(changed, left, top, right, bottom);
       Script.callMethod(callbackProcs[CB_LAYOUT], "call" , new Object[]{changed, left, top, right, bottom});
     } else {
@@ -180,7 +183,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    if (callbackProcs[CB_MEASURE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_MEASURE] != null) {
       super.onMeasure(widthMeasureSpec, heightMeasureSpec);
       Script.callMethod(callbackProcs[CB_MEASURE], "call" , new Object[]{widthMeasureSpec, heightMeasureSpec});
     } else {
@@ -189,7 +192,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onRestoreInstanceState(android.os.Parcelable state) {
-    if (callbackProcs[CB_RESTORE_INSTANCE_STATE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_RESTORE_INSTANCE_STATE] != null) {
       super.onRestoreInstanceState(state);
       Script.callMethod(callbackProcs[CB_RESTORE_INSTANCE_STATE], "call" , state);
     } else {
@@ -198,7 +201,7 @@ public class RubotoView extends android.view.View {
   }
 
   public android.os.Parcelable onSaveInstanceState() {
-    if (callbackProcs[CB_SAVE_INSTANCE_STATE] != null) {
+    if (callbackProcs != null && callbackProcs[CB_SAVE_INSTANCE_STATE] != null) {
       super.onSaveInstanceState();
       return (android.os.Parcelable) Script.callMethod(callbackProcs[CB_SAVE_INSTANCE_STATE], "call" , android.os.Parcelable.class);
     } else {
@@ -207,7 +210,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onScrollChanged(int l, int t, int oldl, int oldt) {
-    if (callbackProcs[CB_SCROLL_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_SCROLL_CHANGED] != null) {
       super.onScrollChanged(l, t, oldl, oldt);
       Script.callMethod(callbackProcs[CB_SCROLL_CHANGED], "call" , new Object[]{l, t, oldl, oldt});
     } else {
@@ -216,7 +219,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onSetAlpha(int alpha) {
-    if (callbackProcs[CB_SET_ALPHA] != null) {
+    if (callbackProcs != null && callbackProcs[CB_SET_ALPHA] != null) {
       super.onSetAlpha(alpha);
       return (Boolean) Script.callMethod(callbackProcs[CB_SET_ALPHA], "call" , alpha, Boolean.class);
     } else {
@@ -225,7 +228,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onSizeChanged(int w, int h, int oldw, int oldh) {
-    if (callbackProcs[CB_SIZE_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_SIZE_CHANGED] != null) {
       super.onSizeChanged(w, h, oldw, oldh);
       Script.callMethod(callbackProcs[CB_SIZE_CHANGED], "call" , new Object[]{w, h, oldw, oldh});
     } else {
@@ -234,7 +237,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onTouchEvent(android.view.MotionEvent event) {
-    if (callbackProcs[CB_TOUCH_EVENT] != null) {
+    if (callbackProcs != null && callbackProcs[CB_TOUCH_EVENT] != null) {
       super.onTouchEvent(event);
       return (Boolean) Script.callMethod(callbackProcs[CB_TOUCH_EVENT], "call" , event, Boolean.class);
     } else {
@@ -243,7 +246,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onTrackballEvent(android.view.MotionEvent event) {
-    if (callbackProcs[CB_TRACKBALL_EVENT] != null) {
+    if (callbackProcs != null && callbackProcs[CB_TRACKBALL_EVENT] != null) {
       super.onTrackballEvent(event);
       return (Boolean) Script.callMethod(callbackProcs[CB_TRACKBALL_EVENT], "call" , event, Boolean.class);
     } else {
@@ -252,7 +255,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onWindowFocusChanged(boolean hasWindowFocus) {
-    if (callbackProcs[CB_WINDOW_FOCUS_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_WINDOW_FOCUS_CHANGED] != null) {
       super.onWindowFocusChanged(hasWindowFocus);
       Script.callMethod(callbackProcs[CB_WINDOW_FOCUS_CHANGED], "call" , hasWindowFocus);
     } else {
@@ -261,7 +264,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onWindowVisibilityChanged(int visibility) {
-    if (callbackProcs[CB_WINDOW_VISIBILITY_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_WINDOW_VISIBILITY_CHANGED] != null) {
       super.onWindowVisibilityChanged(visibility);
       Script.callMethod(callbackProcs[CB_WINDOW_VISIBILITY_CHANGED], "call" , visibility);
     } else {
@@ -270,7 +273,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onCheckIsTextEditor() {
-    if (callbackProcs[CB_CHECK_IS_TEXT_EDITOR] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CHECK_IS_TEXT_EDITOR] != null) {
       super.onCheckIsTextEditor();
       return (Boolean) Script.callMethod(callbackProcs[CB_CHECK_IS_TEXT_EDITOR], "call" , Boolean.class);
     } else {
@@ -279,7 +282,7 @@ public class RubotoView extends android.view.View {
   }
 
   public android.view.inputmethod.InputConnection onCreateInputConnection(android.view.inputmethod.EditorInfo outAttrs) {
-    if (callbackProcs[CB_CREATE_INPUT_CONNECTION] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CREATE_INPUT_CONNECTION] != null) {
       super.onCreateInputConnection(outAttrs);
       return (android.view.inputmethod.InputConnection) Script.callMethod(callbackProcs[CB_CREATE_INPUT_CONNECTION], "call" , outAttrs, android.view.inputmethod.InputConnection.class);
     } else {
@@ -288,7 +291,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onFinishTemporaryDetach() {
-    if (callbackProcs[CB_FINISH_TEMPORARY_DETACH] != null) {
+    if (callbackProcs != null && callbackProcs[CB_FINISH_TEMPORARY_DETACH] != null) {
       super.onFinishTemporaryDetach();
       Script.callMethod(callbackProcs[CB_FINISH_TEMPORARY_DETACH], "call" );
     } else {
@@ -297,7 +300,7 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyPreIme(int keyCode, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_PRE_IME] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_PRE_IME] != null) {
       super.onKeyPreIme(keyCode, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_PRE_IME], "call" , new Object[]{keyCode, event}, Boolean.class);
     } else {
@@ -306,7 +309,7 @@ public class RubotoView extends android.view.View {
   }
 
   public void onStartTemporaryDetach() {
-    if (callbackProcs[CB_START_TEMPORARY_DETACH] != null) {
+    if (callbackProcs != null && callbackProcs[CB_START_TEMPORARY_DETACH] != null) {
       super.onStartTemporaryDetach();
       Script.callMethod(callbackProcs[CB_START_TEMPORARY_DETACH], "call" );
     } else {
@@ -315,11 +318,38 @@ public class RubotoView extends android.view.View {
   }
 
   public boolean onKeyLongPress(int keyCode, android.view.KeyEvent event) {
-    if (callbackProcs[CB_KEY_LONG_PRESS] != null) {
+    if (callbackProcs != null && callbackProcs[CB_KEY_LONG_PRESS] != null) {
       super.onKeyLongPress(keyCode, event);
       return (Boolean) Script.callMethod(callbackProcs[CB_KEY_LONG_PRESS], "call" , new Object[]{keyCode, event}, Boolean.class);
     } else {
       return super.onKeyLongPress(keyCode, event);
+    }
+  }
+
+  public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+    if (callbackProcs != null && callbackProcs[CB_CONFIGURATION_CHANGED] != null) {
+      super.onConfigurationChanged(newConfig);
+      Script.callMethod(callbackProcs[CB_CONFIGURATION_CHANGED], "call" , newConfig);
+    } else {
+      super.onConfigurationChanged(newConfig);
+    }
+  }
+
+  public void onDisplayHint(int hint) {
+    if (callbackProcs != null && callbackProcs[CB_DISPLAY_HINT] != null) {
+      super.onDisplayHint(hint);
+      Script.callMethod(callbackProcs[CB_DISPLAY_HINT], "call" , hint);
+    } else {
+      super.onDisplayHint(hint);
+    }
+  }
+
+  public void onVisibilityChanged(android.view.View changedView, int visibility) {
+    if (callbackProcs != null && callbackProcs[CB_VISIBILITY_CHANGED] != null) {
+      super.onVisibilityChanged(changedView, visibility);
+      Script.callMethod(callbackProcs[CB_VISIBILITY_CHANGED], "call" , new Object[]{changedView, visibility});
+    } else {
+      super.onVisibilityChanged(changedView, visibility);
     }
   }
 

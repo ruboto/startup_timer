@@ -15,7 +15,7 @@ public class RubotoOnClickListener implements android.view.View.OnClickListener 
   }
 	
   public void onClick(android.view.View v) {
-    if (callbackProcs[CB_CLICK] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CLICK] != null) {
       Script.callMethod(callbackProcs[CB_CLICK], "call" , v);
     }
   }

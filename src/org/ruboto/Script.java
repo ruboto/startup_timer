@@ -33,6 +33,7 @@ public class Script {
 
     private String name = null;
     private static Object ruby;
+    private static PrintStream output = null;
     private static boolean initialized = false;
 
     private static String localContextScope = "SINGLETON";
@@ -70,18 +71,19 @@ public class Script {
 	}
 
     public static synchronized boolean setUpJRuby(Context appContext) {
-        return setUpJRuby(appContext, System.out);
+        return setUpJRuby(appContext, output == null ? System.out : output);
     }
 
     public static synchronized boolean setUpJRuby(Context appContext, PrintStream out) {
         if (!initialized) {
             Log.d(TAG, "Setting up JRuby runtime");
-            System.setProperty("jruby.bytecode.version", "1.5");
+            System.setProperty("jruby.bytecode.version", "1.6");
             System.setProperty("jruby.interfaces.useProxy", "true");
             System.setProperty("jruby.management.enabled", "false");
             System.setProperty("jruby.objectspace.enabled", "false");
             System.setProperty("jruby.thread.pooling", "true");
             System.setProperty("jruby.native.enabled", "false");
+            // System.setProperty("jruby.compat.version", "RUBY1_8"); // RUBY1_9 is the default
 
             // Uncomment these to debug Ruby source loading
             // System.setProperty("jruby.debug.loadService", "true");
@@ -103,8 +105,11 @@ public class Script {
                 String packageName = "org.ruboto.core";
                 try {
                     apkName = appContext.getPackageManager().getApplicationInfo(packageName, 0).sourceDir;
-                } catch (PackageManager.NameNotFoundException e) {
-                    System.out.println("JRuby not found");
+                } catch (PackageManager.NameNotFoundException e2) {
+                    out.println("JRuby not found in local APK:");
+                    e1.printStackTrace(out);
+                    out.println("JRuby not found in platform APK:");
+                    e2.printStackTrace(out);
                     return false;
                 }
 
@@ -169,10 +174,10 @@ public class Script {
                 callScriptingContainerMethod(Void.class, "setCurrentDirectory", defaultCurrentDir);
 
                 if (out != null) {
-        	        Method setOutputMethod = ruby.getClass().getMethod("setOutput", PrintStream.class);
-        	        setOutputMethod.invoke(ruby, out);
-        	        Method setErrorMethod = ruby.getClass().getMethod("setError", PrintStream.class);
-        	        setErrorMethod.invoke(ruby, out);
+                  output = out;
+                  setOutputStream(out);
+                } else if (output != null) {
+                  setOutputStream(output);
                 }
 
                 String jrubyHome = "file:" + apkName + "!";
@@ -202,6 +207,29 @@ public class Script {
             }
         }
         return initialized;
+    }
+
+    public static void setOutputStream(PrintStream out) {
+      if (ruby == null) {
+        output = out;
+      } else {
+        try {
+          Method setOutputMethod = ruby.getClass().getMethod("setOutput", PrintStream.class);
+          setOutputMethod.invoke(ruby, out);
+          Method setErrorMethod = ruby.getClass().getMethod("setError", PrintStream.class);
+          setErrorMethod.invoke(ruby, out);
+        } catch (IllegalArgumentException e) {
+            handleInitException(e);
+        } catch (SecurityException e) {
+            handleInitException(e);
+        } catch (IllegalAccessException e) {
+            handleInitException(e);
+        } catch (InvocationTargetException e) {
+            handleInitException(e);
+        } catch (NoSuchMethodException e) {
+            handleInitException(e);
+        }
+      }
     }
 
     private static void handleInitException(Exception e) {
@@ -252,7 +280,8 @@ public class Script {
         } catch (IllegalAccessException iae) {
             throw new RuntimeException(iae);
         } catch (java.lang.reflect.InvocationTargetException ite) {
-            throw ((RuntimeException) ite.getCause());
+ //           throw ((RuntimeException) ite.getCause());
+            return null;
         }
 	}
 
@@ -522,14 +551,34 @@ public class Script {
         return null;
 	}
 
-	public static <T> T callMethod(Object receiver, String methodName,
-			Object arg, Class<T> returnType) {
-		return callMethod(receiver, methodName, new Object[]{arg}, returnType);
+	@SuppressWarnings("unchecked")
+	public static <T> T callMethod(Object receiver, String methodName, Object arg, Class<T> returnType) {
+    try {
+      Method callMethodMethod = ruby.getClass().getMethod("callMethod", Object.class, String.class, Object.class, Class.class);
+      return (T) callMethodMethod.invoke(ruby, receiver, methodName, arg, returnType);
+    } catch (NoSuchMethodException nsme) {
+      throw new RuntimeException(nsme);
+    } catch (IllegalAccessException iae) {
+      throw new RuntimeException(iae);
+    } catch (java.lang.reflect.InvocationTargetException ite) {
+      printStackTrace(ite);
+    }
+    return null;
 	}
 
-	public static <T> T callMethod(Object receiver, String methodName,
-			Class<T> returnType) {
-		return callMethod(receiver, methodName, new Object[]{}, returnType);
+	@SuppressWarnings("unchecked")
+	public static <T> T callMethod(Object receiver, String methodName, Class<T> returnType) {
+    try {
+      Method callMethodMethod = ruby.getClass().getMethod("callMethod", Object.class, String.class, Class.class);
+      return (T) callMethodMethod.invoke(ruby, receiver, methodName, returnType);
+    } catch (NoSuchMethodException nsme) {
+      throw new RuntimeException(nsme);
+    } catch (IllegalAccessException iae) {
+      throw new RuntimeException(iae);
+    } catch (java.lang.reflect.InvocationTargetException ite) {
+      printStackTrace(ite);
+    }
+    return null;
 	}
 
 	private static void printStackTrace(Throwable t) {

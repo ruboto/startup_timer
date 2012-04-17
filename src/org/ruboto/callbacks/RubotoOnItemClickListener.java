@@ -15,7 +15,7 @@ public class RubotoOnItemClickListener implements android.widget.AdapterView.OnI
   }
 	
   public void onItemClick(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
-    if (callbackProcs[CB_ITEM_CLICK] != null) {
+    if (callbackProcs != null && callbackProcs[CB_ITEM_CLICK] != null) {
       Script.callMethod(callbackProcs[CB_ITEM_CLICK], "call" , new Object[]{parent, view, position, id});
     }
   }

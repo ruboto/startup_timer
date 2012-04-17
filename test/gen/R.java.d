@@ -2,4 +2,7 @@
  : /Users/uwe/workspace/jruby/startup_timer/test/res/drawable-hdpi/icon.png \
 /Users/uwe/workspace/jruby/startup_timer/test/res/drawable-ldpi/icon.png \
 /Users/uwe/workspace/jruby/startup_timer/test/res/drawable-mdpi/icon.png \
+/Users/uwe/workspace/jruby/startup_timer/test/bin/res/drawable-hdpi/icon.png \
+/Users/uwe/workspace/jruby/startup_timer/test/bin/res/drawable-ldpi/icon.png \
+/Users/uwe/workspace/jruby/startup_timer/test/bin/res/drawable-mdpi/icon.png \
 /Users/uwe/workspace/jruby/startup_timer/test/AndroidManifest.xml \

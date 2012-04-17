@@ -76,13 +76,24 @@ end
 # Import a class and set it up for handlers
 #
 
-def ruboto_import(package_class)
-  klass = java_import(package_class) || eval("Java::#{package_class}")
-  return unless klass
+def ruboto_import(*package_classes)
+  already_classes = package_classes.select{|i| not i.is_a?(String) and not i.is_a?(Symbol)}
+  imported_classes = package_classes - already_classes
 
-  klass.class_eval do
-    extend Ruboto::CallbackClass
-    include Ruboto::Callbacks
+  unless imported_classes.empty?
+    # TODO(uwe): The first part of this "if" is only needed for JRuby 1.6.x.  Simplify when we stop supporting JRuby 1.6.x
+    if imported_classes.size == 1
+      imported_classes = [*(java_import(*imported_classes) || eval("Java::#{imported_classes[0]}"))]
+    else
+      imported_classes = java_import(imported_classes)
+    end
+  end
+
+  (already_classes + imported_classes).each do |package_class|
+    package_class.class_eval do
+      extend Ruboto::CallbackClass
+      include Ruboto::Callbacks
+    end
   end
 end
 

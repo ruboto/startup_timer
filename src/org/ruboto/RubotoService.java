@@ -68,7 +68,7 @@ public class RubotoService extends android.app.Service {
    */
 
   public android.os.IBinder onBind(android.content.Intent intent) {
-    if (callbackProcs[CB_BIND] != null) {
+    if (callbackProcs != null && callbackProcs[CB_BIND] != null) {
       return (android.os.IBinder) Script.callMethod(callbackProcs[CB_BIND], "call" , intent, android.os.IBinder.class);
     } else {
       return null;
@@ -76,7 +76,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public void onConfigurationChanged(android.content.res.Configuration newConfig) {
-    if (callbackProcs[CB_CONFIGURATION_CHANGED] != null) {
+    if (callbackProcs != null && callbackProcs[CB_CONFIGURATION_CHANGED] != null) {
       super.onConfigurationChanged(newConfig);
       Script.callMethod(callbackProcs[CB_CONFIGURATION_CHANGED], "call" , newConfig);
     } else {
@@ -85,7 +85,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public void onDestroy() {
-    if (callbackProcs[CB_DESTROY] != null) {
+    if (callbackProcs != null && callbackProcs[CB_DESTROY] != null) {
       super.onDestroy();
       Script.callMethod(callbackProcs[CB_DESTROY], "call" );
     } else {
@@ -94,7 +94,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public void onLowMemory() {
-    if (callbackProcs[CB_LOW_MEMORY] != null) {
+    if (callbackProcs != null && callbackProcs[CB_LOW_MEMORY] != null) {
       super.onLowMemory();
       Script.callMethod(callbackProcs[CB_LOW_MEMORY], "call" );
     } else {
@@ -103,7 +103,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public void onRebind(android.content.Intent intent) {
-    if (callbackProcs[CB_REBIND] != null) {
+    if (callbackProcs != null && callbackProcs[CB_REBIND] != null) {
       super.onRebind(intent);
       Script.callMethod(callbackProcs[CB_REBIND], "call" , intent);
     } else {
@@ -112,7 +112,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public boolean onUnbind(android.content.Intent intent) {
-    if (callbackProcs[CB_UNBIND] != null) {
+    if (callbackProcs != null && callbackProcs[CB_UNBIND] != null) {
       super.onUnbind(intent);
       return (Boolean) Script.callMethod(callbackProcs[CB_UNBIND], "call" , intent, Boolean.class);
     } else {
@@ -121,7 +121,7 @@ public class RubotoService extends android.app.Service {
   }
 
   public int onStartCommand(android.content.Intent intent, int flags, int startId) {
-    if (callbackProcs[CB_START_COMMAND] != null) {
+    if (callbackProcs != null && callbackProcs[CB_START_COMMAND] != null) {
       super.onStartCommand(intent, flags, startId);
       return (Integer) Script.callMethod(callbackProcs[CB_START_COMMAND], "call" , new Object[]{intent, flags, startId}, Integer.class);
     } else {

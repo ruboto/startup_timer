@@ -2,11 +2,9 @@ package org.ruboto;
 
 import org.ruboto.Script;
 import java.io.IOException;
-import android.app.ProgressDialog;
 
 public class RubotoService extends android.app.Service {
   private String scriptName;
-  private String remoteVariable = "";
   public Object[] args;
 
   public static final int CB_BIND = 0;
@@ -23,11 +21,6 @@ public class RubotoService extends android.app.Service {
     callbackProcs[id] = obj;
   }
 	
-  public RubotoService setRemoteVariable(String var) {
-    remoteVariable = ((var == null) ? "" : (var + "."));
-    return this;
-  }
-
   public void setScriptName(String name){
     scriptName = name;
   }

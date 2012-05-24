@@ -16,7 +16,7 @@ require 'ruboto/activity'
 module Ruboto
   module Callbacks
     def method_missing(name, *args, &block)
-      if name.to_s =~ /^handle_(.*)/ and (const = self.class.const_get("CB_#{$1.upcase}"))
+      if name.to_s =~ /^handle_(.*)/ && self.class.respond_to?(:const_get) && (const = self.class.const_get("CB_#{$1.upcase}"))
         setCallbackProc(const, block)
         self
       else
@@ -25,7 +25,7 @@ module Ruboto
     end
 
     def respond_to?(name)
-      return true if name.to_s =~ /^handle_(.*)/ and self.class.const_get("CB_#{$1.upcase}")
+      return true if name.to_s =~ /^handle_(.*)/ && self.class.respond_to?(:const_get) && self.class.const_get("CB_#{$1.upcase}")
       super
     end
 
@@ -112,18 +112,15 @@ end
 # Allows RubotoActivity to handle callbacks covering Class based handlers
 #
 
-def ruboto_register_handler(handler_class, unique_name, for_class, method_name)
-  klass_name = handler_class[/.+\.([A-Z].+)/, 1]
-  klass      = ruboto_import handler_class
-
+def ruboto_register_handler(unique_name, for_class, method_name)
   unless RubotoActivity.method_defined? "#{unique_name}_handler"
     RubotoActivity.class_eval "
       def #{unique_name}_handler
-        @#{unique_name}_handler ||= #{klass_name}.new
+        @#{unique_name}_handler
       end
 
       def handle_#{unique_name}(&block)
-        #{unique_name}_handler.handle_#{unique_name} &block
+        @#{unique_name}_handler = block
         self
       end
     "
@@ -147,7 +144,7 @@ def setup_button
     end
   end
 
-  ruboto_register_handler("org.ruboto.callbacks.RubotoOnClickListener", "click", Button, "setOnClickListener")
+  ruboto_register_handler("click", Button, "setOnClickListener")
 end
 
 def setup_image_button
@@ -158,7 +155,7 @@ def setup_image_button
     end
   end
 
-  ruboto_register_handler("org.ruboto.callbacks.RubotoOnClickListener", "click", ImageButton, "setOnClickListener")
+  ruboto_register_handler("click", ImageButton, "setOnClickListener")
 end
 
 def setup_list_view
@@ -189,7 +186,7 @@ def setup_list_view
     end
   end
 
-  ruboto_register_handler("org.ruboto.callbacks.RubotoOnItemClickListener", "item_click", Java::android.widget.ListView, "setOnItemClickListener") # legacy
+  ruboto_register_handler("item_click", Java::android.widget.ListView, "setOnItemClickListener") # legacy
 end
 
 def setup_spinner
@@ -218,6 +215,6 @@ def setup_spinner
     end
   end
 
-  ruboto_register_handler("org.ruboto.callbacks.RubotoOnItemSelectedListener", "item_selected", Java::android.widget.Spinner, "setOnItemSelectedListener") # legacy
+  ruboto_register_handler("item_selected", Java::android.widget.Spinner, "setOnItemSelectedListener") # legacy
 end
 

@@ -1,13 +1,11 @@
 package org.ruboto;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetManager;
-import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
 
@@ -15,7 +13,6 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +30,7 @@ public class Script {
 
     private String name = null;
     private static Object ruby;
+    private static boolean isDebugBuild = false;
     private static PrintStream output = null;
     private static boolean initialized = false;
 
@@ -41,6 +39,7 @@ public class Script {
 
     public static final String TAG = "RUBOTO"; // for logging
     private static String JRUBY_VERSION;
+    private static String RUBOTO_CORE_VERSION_NAME;
 
     /*************************************************************************************************
      * 
@@ -70,13 +69,23 @@ public class Script {
 		return initialized;
 	}
 
+	public static boolean usesPlatformApk() {
+		return RUBOTO_CORE_VERSION_NAME != null;
+	}
+	
+	public static String getPlatformVersionName() {
+		return RUBOTO_CORE_VERSION_NAME;
+	}
+	
     public static synchronized boolean setUpJRuby(Context appContext) {
         return setUpJRuby(appContext, output == null ? System.out : output);
     }
 
+    @SuppressWarnings("unchecked")
     public static synchronized boolean setUpJRuby(Context appContext, PrintStream out) {
         if (!initialized) {
-            Log.d(TAG, "Setting up JRuby runtime");
+            setDebugBuild(appContext);
+            Log.d(TAG, "Setting up JRuby runtime (" + (isDebugBuild ? "DEBUG" : "RELEASE") + ")");
             System.setProperty("jruby.bytecode.version", "1.6");
             System.setProperty("jruby.interfaces.useProxy", "true");
             System.setProperty("jruby.management.enabled", "false");
@@ -104,7 +113,9 @@ public class Script {
             } catch (ClassNotFoundException e1) {
                 String packageName = "org.ruboto.core";
                 try {
-                    apkName = appContext.getPackageManager().getApplicationInfo(packageName, 0).sourceDir;
+                	PackageInfo pkgInfo = appContext.getPackageManager().getPackageInfo(packageName, 0);
+                    apkName = pkgInfo.applicationInfo.sourceDir;
+                	RUBOTO_CORE_VERSION_NAME = pkgInfo.versionName;
                 } catch (PackageManager.NameNotFoundException e2) {
                     out.println("JRuby not found in local APK:");
                     e1.printStackTrace(out);
@@ -280,8 +291,11 @@ public class Script {
         } catch (IllegalAccessException iae) {
             throw new RuntimeException(iae);
         } catch (java.lang.reflect.InvocationTargetException ite) {
- //           throw ((RuntimeException) ite.getCause());
-            return null;
+            if (isDebugBuild) {
+                throw ((RuntimeException) ite.getCause());
+            } else {
+                return null;
+            }
         }
 	}
 
@@ -327,24 +341,6 @@ public class Script {
 
     public static File getDirFile() {
     	return scriptsDirFile;
-    }
-
-    private static void setLoadPath(List<String> loadPath) {
-        // callScriptingContainerMethod(Void.class, "setLoadPaths", loadPath);
-        try {
-            Method setLoadPathsMethod = ruby.getClass().getMethod("setLoadPaths", List.class);
-            setLoadPathsMethod.invoke(ruby, loadPath);
-        } catch (NoSuchMethodException nsme) {
-            throw new RuntimeException(nsme);
-        } catch (IllegalAccessException iae) {
-            throw new RuntimeException(iae);
-        } catch (java.lang.reflect.InvocationTargetException ite) {
-            throw new RuntimeException(ite);
-        }
-    }
-
-    private static List<String> getLoadPath() {
-        return callScriptingContainerMethod(List.class, "getLoadPaths");
     }
 
     public static Boolean configDir(String scriptsDir) {
@@ -400,27 +396,38 @@ public class Script {
 		}
     }
     
-    private static boolean isDebugBuild(Context context) {
+    private static void setDebugBuild(Context context) {
         PackageManager pm = context.getPackageManager();
         PackageInfo pi;
         try {
             pi = pm.getPackageInfo(context.getPackageName(), 0);
-            return ((pi.applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+            isDebugBuild = ((pi.applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
         } catch (NameNotFoundException e) {
-            return false;
+            isDebugBuild = false;
         }
-
     }
 
     private static String scriptsDirName(Context context) {
         File storageDir = null;
-        if (isDebugBuild(context)) {
+        if (isDebugBuild) {
 
             // FIXME(uwe): Simplify this as soon as we drop support for android-7 or JRuby 1.5.6 or JRuby 1.6.2
             Log.i(TAG, "JRuby VERSION: " + JRUBY_VERSION);
             if (!JRUBY_VERSION.equals("1.5.6") && !JRUBY_VERSION.equals("1.6.2") && android.os.Build.VERSION.SDK_INT >= 8) {
-                put("script_context", context);
-                storageDir = (File) exec("script_context.getExternalFilesDir(nil)");
+                try {
+					Method method = context.getClass().getMethod("getExternalFilesDir", String.class);
+					storageDir = (File) method.invoke(context, (Object) null);
+				} catch (SecurityException e) {
+					printStackTrace(e);
+				} catch (NoSuchMethodException e) {
+					printStackTrace(e);
+				} catch (IllegalArgumentException e) {
+					printStackTrace(e);
+				} catch (IllegalAccessException e) {
+					printStackTrace(e);
+				} catch (InvocationTargetException e) {
+					printStackTrace(e);
+				}
             } else {
                 storageDir = new File(Environment.getExternalStorageDirectory(), "Android/data/" + context.getPackageName() + "/files");
                 Log.e(TAG, "Calculated path to sdcard the old way: " + storageDir);
@@ -438,19 +445,7 @@ public class Script {
         return storageDir.getAbsolutePath() + "/scripts";
     }
 
-    private static void copyScriptsIfNeeded(Context context) {
-        String to = scriptsDirName(context);
-		Log.i(TAG, "Checking scripts in " + to);
-
-        /* the if makes sure we only do this the first time */
-        if (configDir(to)) {
-			Log.i(TAG, "Copying scripts to " + to);
-        	copyAssets(context, "scripts");
-        }
-    }
-
-
-    /*************************************************************************************************
+     /*************************************************************************************************
     *
     * Constructors
     */
@@ -503,7 +498,7 @@ public class Script {
      */
 
     public static String getScriptFilename() {
-        return callScriptingContainerMethod(String.class, "getScriptFilename");
+        return (String)callScriptingContainerMethod(String.class, "getScriptFilename");
     }
 
     public static void setScriptFilename(String name) {
@@ -525,6 +520,9 @@ public class Script {
             throw new RuntimeException(iae);
         } catch (java.lang.reflect.InvocationTargetException ite) {
             printStackTrace(ite);
+            if (isDebugBuild) {
+                throw new RuntimeException(ite);
+            }
         }
     }
 

@@ -4,7 +4,6 @@ import java.io.IOException;
 
 public class RubotoBroadcastReceiver extends android.content.BroadcastReceiver {
     private String scriptName = null;
-    private boolean initialized = false;
 
     public void setCallbackProc(int id, Object obj) {
         // Error: no callbacks

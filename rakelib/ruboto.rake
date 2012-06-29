@@ -19,6 +19,7 @@ UPDATE_MARKER_FILE = File.join(PROJECT_DIR, 'bin', 'LAST_UPDATE')
 BUNDLE_JAR         = File.expand_path 'libs/bundle.jar'
 BUNDLE_PATH        = File.expand_path 'bin/bundle'
 MANIFEST_FILE      = File.expand_path 'AndroidManifest.xml'
+PROJECT_PROPS_FILE = File.expand_path 'project.properties'
 RUBOTO_CONFIG_FILE = File.expand_path 'ruboto.yml'
 GEM_FILE           = File.expand_path('Gemfile.apk')
 GEM_LOCK_FILE      = File.expand_path('Gemfile.apk.lock')
@@ -142,7 +143,16 @@ task :uninstall do
   uninstall_apk
 end
 
-file MANIFEST_FILE
+file PROJECT_PROPS_FILE
+file MANIFEST_FILE => PROJECT_PROPS_FILE do
+  sdk_level = File.read(PROJECT_PROPS_FILE).scan(/(?:target=android-)(\d+)/)[0][0].to_i
+  old_manifest = File.read(MANIFEST_FILE)
+  manifest = old_manifest.dup
+  manifest.sub!(/(android:minSdkVersion=').*?(')/){|m| "#$1#{sdk_level}#$2"}
+  manifest.sub!(/(android:targetSdkVersion=').*?(')/){|m| "#$1#{sdk_level}#$2"}
+  File.open(MANIFEST_FILE, 'w'){|f| f << manifest} if manifest != old_manifest
+end
+
 file RUBOTO_CONFIG_FILE
 
 file APK_FILE => APK_DEPENDENCIES do |t|
@@ -330,9 +340,9 @@ end
 def package_installed? test = false
   package_name = "#{package}#{'.tests' if test}"
   ['', '-0', '-1', '-2'].each do |i|
-    p = "/data/app/#{package_name}#{i}.apk"
-    o = `adb shell ls -l #{p}`.chomp
-    if o =~ /^-rw-r--r-- system\s+system\s+(\d+) \d{4}-\d{2}-\d{2} \d{2}:\d{2} #{File.basename(p)}$/
+    path = "/data/app/#{package_name}#{i}.apk"
+    o = `adb shell ls -l #{path}`.chomp
+    if o =~ /^-rw-r--r-- system\s+system\s+(\d+) \d{4}-\d{2}-\d{2} \d{2}:\d{2} #{File.basename(path)}$/
       apk_file = test ? TEST_APK_FILE : APK_FILE
       if !File.exists?(apk_file) || $1.to_i == File.size(apk_file)
         return true
@@ -343,8 +353,6 @@ def package_installed? test = false
   end
   return nil
 end
-
-private
 
 def replace_faulty_code(faulty_file, faulty_code)
   explicit_requires = Dir["#{faulty_file.chomp('.rb')}/*.rb"].sort.map { |f| File.basename(f) }.map do |filename|
@@ -380,14 +388,27 @@ def build_apk(t, release)
 end
 
 def install_apk
+  failure_pattern = /^Failure \[(.*)\]/
+  success_pattern = /^Success/
   case package_installed?
   when true
     puts "Package #{package} already installed."
     return
   when false
-    puts "Package installed, but of wrong size."
+    puts "Package #{package} already installed, but of different size.  Replacing package."
+    output = `adb install -r #{APK_FILE} 2>&1`
+    return if $? == 0 && output !~ failure_pattern && output =~ success_pattern
+    case $1
+    when 'INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES'
+      puts "Found package signed with different certificate.  Uninstalling it and retrying install."
+    else
+      puts "'adb install' returned an unknown error: (#$?) #{$1 ? "[#$1}]" : output}."
+      puts "Uninstalling #{package} and retrying install."
+    end
+    uninstall_apk
   end
-  sh 'ant installd'
+  output = `adb install #{APK_FILE} 2>&1`
+  raise "Install failed (#{$?}) #{$1 ? "[#$1}]" : output}" if $? != 0 || output =~ failure_pattern || output !~ success_pattern
   clear_update
 end
 

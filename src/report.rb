@@ -12,6 +12,7 @@ class Report
   java_import org.apache.http.util.EntityUtils
 
   SERVER_BASE ='http://ruboto-startup.heroku.com/startups'
+  # SERVER_BASE ='http://192.168.0.195:3000/startups' # Uwe's development laptop
 
   def self.send_report(activity, with_image, startup_time)
     activity.toast "Sending measurement"

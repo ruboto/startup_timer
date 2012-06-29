@@ -83,6 +83,10 @@ public class Script {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static synchronized boolean setUpJRuby(Context appContext, PrintStream out) {
         if (!initialized) {
+            // BEGIN Ruboto HeapAlloc
+            byte[] arrayForHeapAllocation = new byte[13 * 1024 * 1024];
+            arrayForHeapAllocation = null;
+            // END Ruboto HeapAlloc
             setDebugBuild(appContext);
             Log.d(TAG, "Setting up JRuby runtime (" + (isDebugBuild ? "DEBUG" : "RELEASE") + ")");
             System.setProperty("jruby.bytecode.version", "1.6");
@@ -277,7 +281,7 @@ public class Script {
         Object result = exec(code);
         return result != null ? result.toString() : "nil";
 // TODO: Why is callMethod returning "main"?
-//		return result != null ? callMethod(result, "inspect", String.class) : "null"; 
+//		return result != null ? callMethod(result, "inspect", String.class) : "null";
     }
 
 	public static Object exec(String code) {
@@ -303,7 +307,6 @@ public class Script {
     }
 
     public static void put(String name, Object object) {
-        // callScriptingContainerMethod(Void.class, "put", name, object);
         try {
             Method putMethod = ruby.getClass().getMethod("put", String.class, Object.class);
             putMethod.invoke(ruby, name, object);
@@ -316,6 +319,19 @@ public class Script {
         }
     }
     
+    public static Object get(String name) {
+        try {
+            Method getMethod = ruby.getClass().getMethod("get", String.class);
+            return getMethod.invoke(ruby, name);
+        } catch (NoSuchMethodException nsme) {
+            throw new RuntimeException(nsme);
+        } catch (IllegalAccessException iae) {
+            throw new RuntimeException(iae);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            throw new RuntimeException(ite);
+        }
+    }
+
     public static void defineGlobalVariable(String name, Object object) {
 		defineGlobalConstant(name, object);
     }
@@ -410,9 +426,8 @@ public class Script {
         File storageDir = null;
         if (isDebugBuild) {
 
-            // FIXME(uwe): Simplify this as soon as we drop support for android-7 or JRuby 1.5.6 or JRuby 1.6.2
-            Log.i(TAG, "JRuby VERSION: " + JRUBY_VERSION);
-            if (!JRUBY_VERSION.equals("1.5.6") && !JRUBY_VERSION.equals("1.6.2") && android.os.Build.VERSION.SDK_INT >= 8) {
+            // FIXME(uwe): Simplify this as soon as we drop support for android-7
+            if (android.os.Build.VERSION.SDK_INT >= 8) {
                 try {
 					Method method = context.getClass().getMethod("getExternalFilesDir", String.class);
 					storageDir = (File) method.invoke(context, (Object) null);
@@ -497,16 +512,52 @@ public class Script {
      */
 
     public static String getScriptFilename() {
-        return (String)callScriptingContainerMethod(String.class, "getScriptFilename");
+        return callScriptingContainerMethod(String.class, "getScriptFilename");
     }
 
     public static void setScriptFilename(String name) {
         callScriptingContainerMethod(Void.class, "setScriptFilename", name);
     }
 
+    public static String toSnakeCase(String s) {
+        return s.replaceAll(
+            String.format("%s|%s|%s",
+                "(?<=[A-Z])(?=[A-Z][a-z])",
+                "(?<=[^A-Z])(?=[A-Z])",
+                "(?<=[A-Za-z])(?=[^A-Za-z])"
+            ),
+            "_"
+        ).toLowerCase();
+    }
+
+    public static String toCamelCase(String s) {
+        String[] parts = s.replace(".rb", "").split("_");
+        for (int i = 0 ; i < parts.length ; i++) {
+            parts[i] = parts[i].substring(0,1).toUpperCase() + parts[i].substring(1);
+        }
+        return java.util.Arrays.toString(parts).replace(", ", "").replaceAll("[\\[\\]]", "");
+    }
+
     public String execute() throws IOException {
+        Object result;
     	Script.setScriptFilename(getClass().getClassLoader().getResource(name).getPath());
-        return Script.execute(getContents());
+        try {
+            Method runScriptletMethod = ruby.getClass().getMethod("runScriptlet", String.class);
+            result = runScriptletMethod.invoke(ruby, getContents());
+        } catch (NoSuchMethodException nsme) {
+            throw new RuntimeException(nsme);
+        } catch (IllegalAccessException iae) {
+            throw new RuntimeException(iae);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            if (isDebugBuild) {
+                throw ((RuntimeException) ite.getCause());
+            } else {
+                return null;
+            }
+        }
+        return result != null ? result.toString() : "nil";
+        // TODO: Why is callMethod returning "main"?
+        // return result != null ? callMethod(result, "inspect", String.class) : "null";
     }
 
 	public static void callMethod(Object receiver, String methodName, Object[] args) {
